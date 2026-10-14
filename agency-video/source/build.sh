@@ -18,7 +18,9 @@ node "$HERE/render.js" "$WORK/out" all 4 jpg
 
 # 3. Clean up the voice, then synthesize SFX + music and mix them under it.
 ffmpeg -v error -y -i "$SRC" -vn -af "highpass=f=75,highpass=f=75,equalizer=f=3200:t=q:w=1.2:g=2,equalizer=f=250:t=q:w=1:g=-1.5,acompressor=threshold=-22dB:ratio=2.5:attack=6:release=120:makeup=2,afade=t=out:st=47.17:d=0.06,aresample=48000" -ac 2 -c:a pcm_s16le "$WORK/aud/voice.wav"
-python3 "$HERE/audio.py" "$WORK/aud/voice.wav" "$WORK/aud/mix.wav"
+python3 "$HERE/audio.py" "$WORK/aud/voice.wav" "$WORK/aud/mix_src.wav"
+# Play the wordless 15.6–18.6s stretch at 1.5x to match the video (see RT in gfx.js), with 10 ms crossfades at the joins.
+ffmpeg -v error -y -i "$WORK/aud/mix_src.wav" -filter_complex "[0]atrim=0:15.61,asetpts=PTS-STARTPTS[a];[0]atrim=15.6:18.6,asetpts=PTS-STARTPTS,atempo=1.5,atrim=0:2.0,asetpts=PTS-STARTPTS[b];[0]atrim=18.59,asetpts=PTS-STARTPTS[c];[a][b]acrossfade=d=0.01:c1=qsin:c2=qsin[ab];[ab][c]acrossfade=d=0.01:c1=qsin:c2=qsin" -c:a pcm_s16le "$WORK/aud/mix.wav"
 
 # 4. Two-pass loudness normalisation to -14 LUFS / -1.5 dBTP (Instagram / TikTok / YouTube Shorts).
 MEAS=$(ffmpeg -v info -i "$WORK/aud/mix.wav" -af loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json -f null - 2>&1 | sed -n '/{/,/}/p' |

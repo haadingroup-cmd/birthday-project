@@ -1,6 +1,8 @@
 # Haadin Global agency ad: review and edit
 
-**Deliverable:** `haadin-global-ad-edited.mp4` (1080×1920, 30 fps, 50.7 s, H.264 + AAC, mastered to −14 LUFS)
+**Deliverable:** `haadin-global-ad-edited.mp4` (1080×1920, 30 fps, 49.7 s, H.264 + AAC, mastered to −14 LUFS)
+
+Times in the table below are in the **original** video. In the edit, everything after 17.6 s comes 1.0 s earlier, because the wordless stretch was tightened.
 
 ## What the video says
 
@@ -31,6 +33,21 @@ The structure (problem, turning point, solution, proof, CTA) is right for an age
 
 ## What was done in this edit
 
+**Review items addressed**
+
+| # | Item | Status |
+|---|---|---|
+| 1 | Ends mid-sentence, no contact | Fixed: CTA button + end card. Contact line is still generic (needs your details) |
+| 2 | Brand line uncaptioned | Fixed |
+| 3 | "Hardin" misspelling | Fixed (covered by the CTA panel) |
+| 4 | Low resolution | Improved: upscaled + sharpened. Needs the original 1080×1920 file to fix properly |
+| 5 | Quiet, flat audio | Fixed: music, SFX, −14 LUFS master |
+| 6 | Services not shown | Fixed: service chips |
+| 7 | Dead air at 15–19 s | Fixed: "Growth Mode" loader, and the stretch now plays at 1.5× (3.8 s → 2.8 s) |
+| 8 | No proof | **Needs you:** a real client result, testimonial or logos |
+| 9 | Soft hook | Fixed: "WHY ISN'T YOUR PHONE RINGING?" from frame 0, so it's also the thumbnail |
+| 10 | Vague CTA | Partly fixed: "Book your free consultation". **Needs you:** where to book (WhatsApp/site/handle) |
+
 **Fixes**
 - Added captions in the original caption style for "I partnered with Haadin Global" (20.1–22.0 s).
 - Added a CTA panel over the bottom from 44.2 s. It hides the "Hardin" misspelling and shows **HAADIN GLOBAL** correctly, then turns into a **BOOK YOUR FREE CONSULTATION** button.
@@ -38,13 +55,14 @@ The structure (problem, turning point, solution, proof, CTA) is right for an age
 - Upscaled to 1080×1920 with sharpening and light grain, and rendered all graphics natively at full resolution so the text stays crisp.
 - Cleaned up the voice (high-pass, EQ, gentle compression) and mastered the final mix to −14 LUFS / −1.5 dBTP.
 
-**Motion graphics** (all in brand colours taken from the existing captions and holograms)
+**Motion graphics** (all in brand colours taken from the existing captions and holograms; times below are in the original video)
+- 0–1.9 s: hook question **"WHY ISN'T YOUR PHONE RINGING?"**, complete on the first frame so it also works as the cover/thumbnail.
 - 1.0 s: sparkles on "looks amazing".
 - 1.9 s: a "CALLS TODAY: 0" card with a struck-out phone.
 - 4.0 s: a search bar that types "your store" and returns "0 results found".
 - 6.4–11 s: TRAFFIC / LEADS / SALES tiles that drop in at **0** with dying red lines. The colour slowly drains from the footage.
 - 11.4–14.2 s: "Flyers ✕ / Discounts ✕ / Posting daily ✕" tags get struck out and fall away, followed by an RGB glitch on "nothing worked".
-- 15.5–19.1 s: a "GROWTH MODE" loader fills the dead air, runs 0→100 % as the colour comes back, then flips to "ON ✓".
+- 15.5–19.1 s: a "GROWTH MODE" loader fills the dead air, runs 0→100 % as the colour comes back, then flips to "ON ✓". The wordless 15.6–18.6 s part plays at 1.5× (frames blended, audio time-stretched without a pitch change), which cuts 1 s of dead air.
 - 21.0 s: **logo reveal** (a globe that draws itself, the wordmark rising letter by letter, a light sweep). It then shrinks into a corner logo that stays on screen until the CTA.
 - 23.55 s: a flash and zoom punch on "everything changed", where the beat drops.
 - 24.7–30 s: service chips pop in on each word: META ADS, GOOGLE ADS, SEO, WEBSITES THAT SELL.

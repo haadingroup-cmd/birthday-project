@@ -6,6 +6,15 @@
 const W = 1080, H = 1920, FPS = 30;
 const SRC_N = 1417, SRC_END = SRC_N / FPS;
 const TOTAL = 50.7;
+// The wordless transformation (source 15.6–18.6s) plays at 1.5x. Everything else is 1:1.
+const RT = { a: 15.6, b: 18.6, k: 1.5 };
+const CUT = (RT.b - RT.a) * (1 - 1 / RT.k);
+const TOTAL_OUT = TOTAL - CUT;
+function srcOf(o) {
+  if (o < RT.a) return o;
+  const d = (RT.b - RT.a) / RT.k;
+  return o < RT.a + d ? RT.a + (o - RT.a) * RT.k : o + CUT;
+}
 const BRAND1 = 'HAADIN', BRAND2 = 'GLOBAL';
 const COL = {
   ink: '#0E0F15', ink2: '#191B27', cream: '#F6EEDF', rasp: '#A8325C',
@@ -217,7 +226,7 @@ function satAt(t) {
   return lerp(0.55, 1.1, eOutC(p(t, 15.3, 17.6)));
 }
 
-function drawVideo(img, t) {
+function drawVideo(img, t, img2 = null, frac = 0) {
   let z = zoomAt(t);
   const [dx, dy] = shakeAt(t);
   z = Math.max(z, 1 + 2.4 * Math.max(Math.abs(dx) / W, Math.abs(dy) / H));
@@ -226,6 +235,7 @@ function drawVideo(img, t) {
   ctx.translate(W / 2 + dx, H * 0.42 + dy); ctx.scale(z, z); ctx.translate(-W / 2, -H * 0.42);
   ctx.filter = `saturate(${satAt(t).toFixed(3)}) contrast(1.06)`;
   ctx.drawImage(img, 0, 0, W, H);
+  if (img2 && frac > 0.01) { ctx.globalAlpha = frac; ctx.drawImage(img2, 0, 0, W, H); ctx.globalAlpha = 1; }
   ctx.restore();
   ctx.filter = 'none';
   // vignette + top shade for header legibility
@@ -276,6 +286,40 @@ function sparkles(t) {
     ctx.closePath(); ctx.fill();
     ctx.restore();
   }
+}
+
+// 0–1.9 hook: a viewer-facing question, complete on frame 0 so it also works as the thumbnail
+function hook(t) {
+  if (t > 1.92) return;
+  const out = eInC(p(t, 1.6, 1.88));
+  const settle = 1 + 0.07 * (1 - eOutC(p(t, 0, .5)));
+  const cy = 1100;
+  ctx.save();
+  ctx.globalAlpha = 1 - out;
+  ctx.translate(W / 2, cy + out * 70);
+  ctx.scale(settle * (1 - .12 * out), settle * (1 - .12 * out));
+  ctx.rotate(-0.035 + 0.006 * Math.sin(t * 7));
+  // line 1: dark block
+  const l1 = 'WHY ISN\u2019T YOUR';
+  ctx.font = font(800, 50); ctx.letterSpacing = '3px';
+  const w1 = ctx.measureText(l1).width + 60, h1 = 86;
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 12;
+  rr(ctx, -w1 / 2, -h1 - 8, w1, h1, 16); ctx.fillStyle = 'rgba(14,15,21,0.92)'; ctx.fill(); ctx.restore();
+  ctx.fillStyle = COL.cream; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(l1, 1.5, -h1 / 2 - 6);
+  ctx.letterSpacing = '0px';
+  // line 2: brand-gradient block
+  const l2 = 'PHONE RINGING?';
+  let fs = 92;
+  ctx.font = font(900, fs, 'Montserrat', 'italic');
+  const mw = ctx.measureText(l2).width;
+  if (mw > 900) { fs = Math.floor(fs * 900 / mw); ctx.font = font(900, fs, 'Montserrat', 'italic'); }
+  const w2 = ctx.measureText(l2).width + 70, h2 = fs * 1.42;
+  ctx.save(); ctx.shadowColor = 'rgba(255,79,139,0.55)'; ctx.shadowBlur = 36; ctx.shadowOffsetY = 10;
+  rr(ctx, -w2 / 2, 0, w2, h2, 20); ctx.fillStyle = grad(ctx, -w2 / 2, 0, w2 / 2, h2); ctx.fill(); ctx.restore();
+  ctx.fillStyle = 'rgba(80,10,40,0.35)'; ctx.fillText(l2, 3, h2 / 2 + 6);
+  ctx.fillStyle = '#fff'; ctx.fillText(l2, 0, h2 / 2 + 2);
+  ctx.restore();
 }
 
 // 1.9–3.9 "my phone never rings": calls-today card
@@ -912,16 +956,20 @@ async function getImg(n) {
 }
 
 window.renderFrame = async function (f, type = 'image/jpeg', q = 0.93) {
-  const t = f / FPS;
-  const n = Math.min(SRC_N, f + 1);
+  const t = srcOf(f / FPS);
+  const fi = Math.floor(t * FPS + 1e-6);
+  const frac = t * FPS - fi;
+  const n = Math.min(SRC_N, fi + 1);
   const img = await getImg(n);
+  const img2 = frac > 0.01 && n < SRC_N ? await getImg(n + 1) : null;
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-  drawVideo(img, t);
+  drawVideo(img, t, img2, frac);
   glitch(t, f);
   // backdrop for glass cards
   bctx.filter = 'blur(6px)'; bctx.drawImage(cv, 0, 0, 270, 480); bctx.filter = 'none';
 
   sparkles(t);
+  hook(t);
   phoneCard(t);
   searchCard(t);
   tilesRow(t, [['TRAFFIC', 6.45], ['LEADS', 8.25], ['SALES', 10.0]], 11.15, 'down');
@@ -946,5 +994,5 @@ window.ready = (async () => {
     document.fonts.load(font(800, 40)), document.fonts.load(font(700, 40)), document.fonts.load(font(600, 40)),
     document.fonts.load('400 40px Bebas'), document.fonts.load('700 40px Inter'), document.fonts.load('600 40px Inter'), document.fonts.load('500 40px Inter'),
   ]);
-  return { total: Math.round(TOTAL * FPS), fonts: [...document.fonts].filter(f => f.status === 'loaded').length };
+  return { total: Math.round(TOTAL_OUT * FPS), fonts: [...document.fonts].filter(f => f.status === 'loaded').length };
 })();
