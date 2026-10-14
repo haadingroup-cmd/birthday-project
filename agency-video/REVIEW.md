@@ -4,6 +4,15 @@
 
 Times in the table below are in the **original** video. In the edit, everything after 17.6 s comes 1.0 s earlier, because the wordless stretch was tightened.
 
+## v3 changes (latest)
+
+- **Sharper picture.** Every frame was AI-upscaled with Real-ESRGAN (general x4v3, run on CPU through ONNX), mixed 85/15 with a plain lanczos upscale so the skin keeps its texture. Eyes, hair, beard and fabric now hold real detail at 1080×1920 instead of being stretched from 478×850.
+- **Laptop fixed.** In the seated shot (5.9–13.4 s) the screen faced the camera while he sat behind it. The whole lid face is now replaced with a tracked, perspective-correct dark-grey lid back. His fingers stay in front as he closes it, and it blends into the real lid back at 13.4 s.
+- **Old pink captions removed** from all 1,046 frames that had them. Each frame borrows the background from the nearest frames where that spot is uncovered, never across a shot change; what stays covered is filled from its surroundings. No magenta remains in any frame outside the hologram shots, and there it's only the holograms themselves.
+- **New professional captions.** Phrase cards (Montserrat 800) on frosted glass. The spoken word gets a sliding brand-gradient highlight, key words are in brand pink, and the timings are frame-accurate (forced alignment + energy envelopes, see `source/pipeline/TIMINGS_NOTES.md`). Each card is sized to fully cover the area where an old caption was removed.
+- **Contact details** on the end card: **www.haadinglobal.com** and **WhatsApp +92 305 4782677**.
+- Service-tag pops are re-synced to the measured word times. Audio is re-mastered (−14 LUFS, −1.5 dBTP).
+
 ## What the video says
 
 | Time | Shot | Voiceover |
@@ -37,16 +46,16 @@ The structure (problem, turning point, solution, proof, CTA) is right for an age
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Ends mid-sentence, no contact | Fixed: CTA button + end card. Contact line is still generic (needs your details) |
+| 1 | Ends mid-sentence, no contact | Fixed: CTA button + end card with website and WhatsApp |
 | 2 | Brand line uncaptioned | Fixed |
 | 3 | "Hardin" misspelling | Fixed (covered by the CTA panel) |
-| 4 | Low resolution | Improved: upscaled + sharpened. Needs the original 1080×1920 file to fix properly |
+| 4 | Low resolution | Fixed as far as the source allows: Real-ESRGAN AI upscale to 1080×1920. The original file would still be better |
 | 5 | Quiet, flat audio | Fixed: music, SFX, −14 LUFS master |
 | 6 | Services not shown | Fixed: service chips |
 | 7 | Dead air at 15–19 s | Fixed: "Growth Mode" loader, and the stretch now plays at 1.5× (3.8 s → 2.8 s) |
 | 8 | No proof | **Needs you:** a real client result, testimonial or logos |
 | 9 | Soft hook | Fixed: "WHY ISN'T YOUR PHONE RINGING?" from frame 0, so it's also the thumbnail |
-| 10 | Vague CTA | Partly fixed: "Book your free consultation". **Needs you:** where to book (WhatsApp/site/handle) |
+| 10 | Vague CTA | Fixed: "Book your free consultation" + www.haadinglobal.com + WhatsApp |
 
 **Fixes**
 - Added captions in the original caption style for "I partnered with Haadin Global" (20.1–22.0 s).
@@ -80,7 +89,7 @@ The structure (problem, turning point, solution, proof, CTA) is right for an age
 
 - **Brand spelling:** "Haadin Global". The captions said "Hardin" and the voice is ambiguous, so this comes from your GitHub org and account name. The name is one constant in `source/gfx.js` (`BRAND1`, `BRAND2`).
 - **CTA wording:** "Book your free consultation". The voice is cut before the last word, so if you say "strategy call", "audit" or similar in the full script, that's a one-line change.
-- **End-card contact line:** "Tap the link in bio • or send us a DM". Send me a phone/WhatsApp number, website or handle and I'll put it on the end card. That's the single most valuable addition left.
+- **WhatsApp number format:** shown as +92 305 4782677 (the international form of 0305-4782677) so viewers in Dubai/London can dial it. It's one line in `source/gfx.js` (`contactChip`).
 - The ✕-ed tactics ("Flyers / Discounts / Posting daily") and the notification texts are illustrative.
 - There are no specific numbers anywhere, on purpose, so the ad makes no claim you can't back up.
 

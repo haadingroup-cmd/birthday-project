@@ -542,13 +542,154 @@ function growthLoader(t) {
   ctx.restore();
 }
 
-// 20.1–22.0 captions for the line the original edit left uncaptioned
-function addedCaptions(t) {
-  const words = [['I', 20.12, 20.32], ['Partnered', 20.32, 20.79], ['With', 20.79, 21.06], ['Haadin', 21.06, 21.47], ['Global', 21.47, 22.05]];
-  for (const [w, a, b] of words) {
-    if (t < a || t >= b) continue;
-    captionWord(ctx, w, W / 2, 1490, 112, p(t, a, a + .12));
+// ---------- captions: phrase cards with a moving active-word highlight ----------
+// Phrases are split from the spoken words; *word* marks an emphasis word (brand colour).
+const PHRASES = [
+  'My store looks *amazing*', 'But my phone *never* *rings*', '*Nobody* even knows we *exist*',
+  'No *traffic.*', 'No *leads.*', 'No *sales.*', 'I tried *everything*', 'And *nothing* *worked.*',
+  'Then I partnered with', '*Haadin* *Global*', 'And everything *changed.*',
+  '*Meta* and *Google* *Ads*', 'and *SEO*,', 'a *website* that *sells.*',
+  'Now customers find me', 'from *Dubai* to *London.*', 'Now my phone *never* *stops.*',
+  'More *leads.*', 'More *orders.*', 'Real *results.*', 'Every *single* *month.*',
+  'Want the same for your *business?*',
+];
+const CAP = { y: 1488, size: 60, lineH: 78, maxW: 880, padX: 38, padY: 24, end: 44.18 };
+let CAPS = [];
+const norm = w => w.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+function buildCaptions(words, fill) {
+  // Match phrase tokens to the timed words in order. A token that isn't spoken within the
+  // next few words is dropped, so captions always show exactly what is said.
+  let wi = 0;
+  CAPS = PHRASES.map(ph => {
+    const toks = [];
+    for (const tok of ph.split(' ')) {
+      const emph = tok.startsWith('*');
+      const text = tok.replace(/\*/g, '');
+      let j = wi;
+      while (j < Math.min(words.length, wi + 4) && norm(words[j].w) !== norm(text)) j++;
+      if (j >= words.length || norm(words[j].w) !== norm(text)) { console.error('caption token not spoken:', text); continue; }
+      wi = j + 1;
+      toks.push({ text, emph, s: words[j].s, e: words[j].e });
+    }
+    return { toks, s: toks[0].s - 0.08, e: toks[toks.length - 1].e + 0.3 };
+  }).filter(c => c.toks.length);
+  for (let i = 0; i < CAPS.length - 1; i++) CAPS[i].e = Math.min(CAPS[i].e, CAPS[i + 1].s - 0.02);
+  CAPS[CAPS.length - 1].e = Math.min(CAPS[CAPS.length - 1].e, CAP.end);
+  coverFill(fill || {});
+}
+
+// The burned-in captions were removed by filling from neighbouring frames; where no nearby
+// frame showed the background, the fill is spatial (soft). Every such frame must sit under a
+// caption card, so phrases are stretched in time and cards grown to cover those areas
+// (in screen space, i.e. after the camera zoom of drawVideo).
+function coverFill(fill) {
+  for (const c of CAPS) c.req = null;
+  for (const [nStr, fi] of Object.entries(fill)) {
+    if (!fi.rest) continue;
+    const n = +nStr, t = (n - 1) / FPS;
+    if (t >= CAP.end) continue;
+    // the most recently started phrase that is on screen owns the frame
+    let c = [...CAPS].reverse().find(c => t >= c.s && t < c.e + 0.12);
+    if (!c) {
+      const prev = [...CAPS].reverse().find(c => c.e <= t), next = CAPS.find(c => c.s > t);
+      if (prev && t - prev.e < 0.7 && (!next || t - prev.e <= next.s - t)) { prev.e = t + 0.04; c = prev; }
+      else if (next && next.s - t < 0.7) { next.s = t - 0.04; c = next; }
+      else { console.error('uncovered fill at frame', n); continue; }
+    }
+    // keep the card fully opaque (past its fade-in, before its fade-out) on this frame
+    const ci = CAPS.indexOf(c);
+    c.s = Math.min(c.s, Math.max(ci > 0 ? CAPS[ci - 1].e + 0.17 : 0, t - 0.13));
+    const nx = CAPS[ci + 1];
+    c.e = Math.max(c.e, Math.min(t + 0.03, nx ? nx.s - 0.02 : Infinity));
+    const z = zoomAt(t), cy = H * 0.42;
+    const [x0, x1, y0, y1] = fi.rest;
+    const X0 = W / 2 + (x0 - W / 2) * z, X1 = W / 2 + (x1 - W / 2) * z;
+    const Y0 = cy + (y0 - cy) * z, Y1 = cy + (y1 - cy) * z;
+    const r = c.req || (c.req = { hw: 0, top: Infinity, bot: -Infinity });
+    r.hw = Math.max(r.hw, W / 2 - X0, X1 - W / 2);
+    // 6 frames have a sliver of fill near the holograms above the band; it is invisible, so ignore it
+    r.top = Math.min(r.top, Math.max(Y0, 1330)); r.bot = Math.max(r.bot, Y1);
   }
+}
+
+function layoutPhrase(ph) {
+  ctx.font = font(800, CAP.size); ctx.letterSpacing = '0px';
+  const space = ctx.measureText(' ').width;
+  for (const tk of ph.toks) tk.w = ctx.measureText(tk.text).width;
+  const span = (a, b) => ph.toks.slice(a, b).reduce((acc, tk, i) => acc + tk.w + (i ? space : 0), 0);
+  let lines = [ph.toks];
+  if (span(0, ph.toks.length) > CAP.maxW && ph.toks.length > 1) {
+    // two lines, split where the longer line is shortest
+    let best = 1, bestW = Infinity;
+    for (let k = 1; k < ph.toks.length; k++) {
+      const m = Math.max(span(0, k), span(k, ph.toks.length));
+      if (m < bestW) { bestW = m; best = k; }
+    }
+    lines = [ph.toks.slice(0, best), ph.toks.slice(best)];
+  }
+  const widths = lines.map(l => l.reduce((a, tk, i) => a + tk.w + (i ? space : 0), 0));
+  const W0 = Math.max(...widths);
+  let cw = W0 + CAP.padX * 2, ch = lines.length * CAP.lineH + CAP.padY * 2;
+  let top = CAP.y - ch / 2;
+  if (ph.req) {
+    const m = 18;
+    cw = Math.max(cw, 2 * (ph.req.hw + m));
+    const t2 = Math.min(top, ph.req.top - m), b2 = Math.max(top + ch, ph.req.bot + m);
+    top = t2; ch = b2 - t2;
+  }
+  const textTop = top + (ch - lines.length * CAP.lineH) / 2;
+  lines.forEach((l, li) => {
+    let x = W / 2 - widths[li] / 2;
+    const y = textTop + CAP.lineH * (li + 0.5);
+    for (const tk of l) { tk.x = x; tk.y = y; x += tk.w + space; }
+  });
+  return { cw, ch, top };
+}
+
+function captions(t) {
+  if (!CAPS.length || t >= CAP.end + 0.2) return;
+  const ph = [...CAPS].reverse().find(c => t >= c.s && t < c.e + 0.16);
+  if (!ph) return;
+  const { cw, ch, top } = layoutPhrase(ph);
+  const kin = p(t, ph.s, ph.s + 0.2), kout = p(t, ph.e, ph.e + 0.16);
+  const a = clamp(kin * 1.6) * (1 - kout);
+  if (a <= 0) return;
+  const sc = lerp(0.94, 1, eOutBack(kin, 1.6)) * lerp(1, 0.97, kout);
+  ctx.save();
+  ctx.globalAlpha = a;
+  const ccy = top + ch / 2;
+  ctx.translate(W / 2, ccy + (1 - eOutC(kin)) * 14); ctx.scale(sc, sc); ctx.translate(-W / 2, -ccy);
+  glass(ctx, W / 2 - cw / 2, top, cw, ch, 30, { tint: 'rgba(10,10,16,0.56)', border: 'rgba(255,255,255,0.14)' });
+  // active word = last word whose start has passed (held until the next word starts)
+  let ai = -1;
+  ph.toks.forEach((tk, i) => { if (t >= tk.s) ai = i; });
+  if (ai >= 0 && t > ph.toks[ai].e + 0.35 && ai === ph.toks.length - 1) ai = -1;
+  if (ai >= 0) {
+    const cur = ph.toks[ai], prev = ph.toks[Math.max(0, ai - 1)];
+    const m = ai > 0 ? eOutC(p(t, cur.s, cur.s + 0.11)) : 1;
+    const px = lerp(prev.x, cur.x, m) - 14, pw = lerp(prev.w, cur.w, m) + 28;
+    const py = lerp(prev.y, cur.y, m) - CAP.size * 0.62, phh = CAP.size * 1.24;
+    ctx.save(); ctx.shadowColor = 'rgba(255,79,139,0.55)'; ctx.shadowBlur = 22;
+    rr(ctx, px, py, pw, phh, 14); ctx.fillStyle = grad(ctx, px, py, px + pw, py + phh); ctx.fill();
+    ctx.restore();
+  }
+  ctx.font = font(800, CAP.size); ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ph.toks.forEach((tk, i) => {
+    const spoken = t >= tk.s;
+    let col = tk.emph ? '#FF7AA6' : '#FFFFFF';
+    if (i === ai) col = '#FFFFFF';
+    ctx.save();
+    ctx.globalAlpha *= spoken ? 1 : 0.5;
+    if (i !== ai) { ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3; }
+    ctx.fillStyle = col;
+    if (i === ai) {
+      const k = p(t, tk.s, tk.s + 0.12), s2 = 1 + 0.05 * Math.sin(Math.PI * k);
+      ctx.translate(tk.x + tk.w / 2, tk.y); ctx.scale(s2, s2); ctx.fillText(tk.text, -tk.w / 2, 2);
+    } else ctx.fillText(tk.text, tk.x, tk.y + 2);
+    ctx.restore();
+  });
+  ctx.restore();
 }
 
 // 21.0–24.3 brand reveal, then docks into a corner bug
@@ -614,8 +755,8 @@ function chip(x, y, label, iconName, k, glow) {
 function serviceChips(t) {
   if (t < 24.6 || t > 31.0) return;
   const rows = [
-    [['META ADS', 'megaphone', 24.75], ['GOOGLE ADS', 'target', 25.8]],
-    [['SEO', 'search', 27.8], ['WEBSITES THAT SELL', 'browser', 29.0]],
+    [['META ADS', 'megaphone', 24.85], ['GOOGLE ADS', 'target', 25.73]],
+    [['SEO', 'search', 27.54], ['WEBSITES THAT SELL', 'browser', 28.87]],
   ];
   ctx.font = font(800, 37); ctx.letterSpacing = '1px';
   rows.forEach((row, ri) => {
@@ -913,7 +1054,8 @@ function endCard(t) {
     ctx.restore();
     tapRipple(ctx, W / 2 + 330, 1290, t, 49.6);
   }
-  line('Tap the link in bio  •  or send us a DM', 1418, font(600, 34, 'Inter'), 'rgba(246,238,223,0.85)', 48.6);
+  contactChip('web', 'www.haadinglobal.com', 1420, 48.55);
+  contactChip('wa', '+92 305 4782677', 1516, 48.7);
   // footer
   {
     const [a, dy] = up(48.8);
@@ -923,7 +1065,7 @@ function endCard(t) {
       const t1 = 'DUBAI', t2 = 'LONDON';
       const w1 = ctx.measureText(t1).width, w2 = ctx.measureText(t2).width;
       const total = 44 + w1 + 90 + w2;
-      let fx = W / 2 - total / 2; const fy = 1735 + dy;
+      let fx = W / 2 - total / 2; const fy = 1760 + dy;
       icon(ctx, 'pin', fx + 16, fy, 34, COL.pink, 2.4);
       ctx.fillStyle = COL.cream; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
       ctx.fillText(t1, fx + 44, fy + 2);
@@ -935,6 +1077,31 @@ function endCard(t) {
   }
 }
 
+// contact chip on the end card: icon disc + text on a glass pill
+function contactChip(kind, text, cy, tin) {
+  const t = curT;
+  const k = p(t, tin, tin + .45); if (k <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = eOutC(k);
+  ctx.translate(0, (1 - eOutC(k)) * 30);
+  ctx.font = font(800, 40); ctx.letterSpacing = '1px';
+  const tw = ctx.measureText(text).width;
+  const h = 84, w = tw + 84 + 56, x = W / 2 - w / 2, y = cy - h / 2;
+  glass(ctx, x, y, w, h, h / 2, { tint: 'rgba(255,255,255,0.08)', border: 'rgba(255,255,255,0.22)' });
+  const ix = x + 14 + 29, iy = cy;
+  if (kind === 'wa') {
+    ctx.fillStyle = '#25D366'; ctx.beginPath(); ctx.arc(ix, iy, 29, 0, 7); ctx.fill();
+    icon(ctx, 'phone', ix, iy, 30, '#fff', 2.4);
+  } else {
+    ctx.fillStyle = grad(ctx, ix - 29, iy - 29, ix + 29, iy + 29); ctx.beginPath(); ctx.arc(ix, iy, 29, 0, 7); ctx.fill();
+    globeIcon(ctx, ix, iy, 13, 1, '#fff', '#fff', 2.6);
+  }
+  ctx.fillStyle = COL.cream; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, ix + 29 + 22, cy + 2);
+  ctx.letterSpacing = '0px';
+  ctx.restore();
+}
+
 function flash(t) {
   const F = [[23.55, .22, .6], [21.03, .14, .22], [47.15, .2, .3]];
   for (const [t0, d, a] of F) {
@@ -944,6 +1111,7 @@ function flash(t) {
 }
 
 // ---------- frame loop ----------
+let curT = 0;
 const imgCache = new Map();
 async function getImg(n) {
   if (imgCache.has(n)) return imgCache.get(n);
@@ -957,6 +1125,7 @@ async function getImg(n) {
 
 window.renderFrame = async function (f, type = 'image/jpeg', q = 0.93) {
   const t = srcOf(f / FPS);
+  curT = t;
   const fi = Math.floor(t * FPS + 1e-6);
   const frac = t * FPS - fi;
   const n = Math.min(SRC_N, fi + 1);
@@ -975,7 +1144,6 @@ window.renderFrame = async function (f, type = 'image/jpeg', q = 0.93) {
   tilesRow(t, [['TRAFFIC', 6.45], ['LEADS', 8.25], ['SALES', 10.0]], 11.15, 'down');
   triedPills(t);
   growthLoader(t);
-  addedCaptions(t);
   brandReveal(t);
   brandBug(t);
   serviceChips(t);
@@ -983,12 +1151,20 @@ window.renderFrame = async function (f, type = 'image/jpeg', q = 0.93) {
   notifications(t);
   tilesRow(t, [['LEADS', 36.85], ['ORDERS', 38.15], ['RESULTS', 39.45]], 40.2, 'up');
   months(t);
+  captions(t);
   ctaPanel(t, img);
   flash(t);
   return cv.toDataURL(type, q);
 };
 
 window.ready = (async () => {
+  try {
+    const words = await (await fetch('words.json', { cache: 'no-store' })).json();
+    let fill = {};
+    try { fill = await (await fetch('fillinfo.json', { cache: 'no-store' })).json(); } catch (e) { console.error('fillinfo.json', e.message); }
+    buildCaptions(words, fill);
+    window.CAPS_DEBUG = CAPS.map(c => [c.toks.map(t => t.text).join(' '), +c.s.toFixed(2), +c.e.toFixed(2), c.req ? [Math.round(c.req.hw), Math.round(c.req.top), Math.round(c.req.bot)] : null]);
+  } catch (e) { console.error('words.json', e.message); }
   await Promise.all([
     document.fonts.load(font(900, 40, 'Montserrat', 'italic')), document.fonts.load(font(900, 40)),
     document.fonts.load(font(800, 40)), document.fonts.load(font(700, 40)), document.fonts.load(font(600, 40)),

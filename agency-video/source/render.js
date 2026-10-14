@@ -11,10 +11,13 @@ const WORKERS = +(process.argv[4] || 4);
 const EXT = process.argv[5] || 'jpg';
 fs.mkdirSync(OUT, { recursive: true });
 
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.jpg': 'image/jpeg', '.woff2': 'font/woff2' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.json': 'application/json' };
 const server = http.createServer((req, res) => {
-  const f = path.join(ROOT, decodeURIComponent(req.url.split('?')[0]));
-  if (!f.startsWith(ROOT) || !fs.existsSync(f)) { res.writeHead(404); return res.end(); }
+  const u = decodeURIComponent(req.url.split('?')[0]);
+  // FRAMES_DIR lets the final render read cleaned/upscaled footage instead of ./frames
+  const base = process.env.FRAMES_DIR && u.startsWith('/frames/') ? process.env.FRAMES_DIR : ROOT;
+  const f = path.join(base, base === ROOT ? u : u.slice('/frames'.length));
+  if (!f.startsWith(base) || !fs.existsSync(f)) { res.writeHead(404); return res.end(); }
   res.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'application/octet-stream' });
   fs.createReadStream(f).pipe(res);
 });
